@@ -54,8 +54,12 @@ int main(int argc, char** argv)
     // Loop the video stream for frames. Press `ESC` to stop.
     int ret = 0;
     bool will_be_touched { false };
-    while (ret == 0 or ret == AVERROR(EAGAIN)) {
+    while (true) {
         ret = decoder.read(will_be_touched);
+        if (ret == AVERROR(EAGAIN))
+            continue;
+        if (ret != 0)
+            break;
         frame_counter.Increment();
 #ifdef WITH_GUI
         cv::imshow("preview", bgr);
