@@ -1,5 +1,9 @@
 // This is a sample code of video processing metrics with Prometheus.
 
+#include <prometheus/counter.h>
+#include <prometheus/exposer.h>
+#include <prometheus/registry.h>
+
 #include "config.h"
 #include "opencv2/opencv.hpp"
 #include "video_decoder.hpp"
@@ -35,12 +39,24 @@ int main(int argc, char** argv)
     std::cout << "Width: " << width << " height: " << height << std::endl;
     cv::Mat bgr(height, width, CV_8UC3, buffer, decoder.get_frame_steps());
 
+    // Get Prometheus ready
+    std::string prom_address { "127.0.0.1:8080" };
+    prometheus::Exposer exposer { prom_address };
+    auto registry = std::make_shared<prometheus::Registry>();
+    auto& counters = prometheus::BuildCounter()
+                         .Name("observed_frames_total")
+                         .Help("Number of processed frames")
+                         .Register(*registry);
+    auto& frame_counter = counters.Add({ { "frames", "processed" } });
+    exposer.RegisterCollectable(registry);
+    std::cout << "Prometheus: " << prom_address + "/metrics" << std::endl;
+
     // Loop the video stream for frames. Press `ESC` to stop.
-    int ret = 0, frame_count = 0;
+    int ret = 0;
     bool will_be_touched { false };
     while (ret == 0 or ret == AVERROR(EAGAIN)) {
-        frame_count++;
         ret = decoder.read(will_be_touched);
+        frame_counter.Increment();
 #ifdef WITH_GUI
         cv::imshow("preview", bgr);
         if (cv::waitKey(1) == 27)
